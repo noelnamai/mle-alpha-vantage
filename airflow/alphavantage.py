@@ -33,9 +33,11 @@ dag = DAG(
     tags=["alphavantage"]
 )
 
+
 # function to check if day is a business day
 def is_business_day(date):
     return bool(len(pd.bdate_range(date, date)))
+
 
 # function to download data from the alphavantage api
 def download_alphavantage_api_data(var_name, params, **kwargs) -> None:
@@ -61,6 +63,7 @@ def download_alphavantage_api_data(var_name, params, **kwargs) -> None:
     except Exception as e:
         logging.error(e)
     time.sleep(15)
+
 
 # function to download top five spy company earnings
 def get_company_earnings(params, **kwargs) -> None:
@@ -93,6 +96,7 @@ def get_company_earnings(params, **kwargs) -> None:
         except Exception as e:
             logging.error(e)
         time.sleep(15)
+
 
 # function to download spy daily data
 def get_spy_daily_data(params, **kwargs) -> None:
@@ -153,8 +157,7 @@ def create_new_data_features(**kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
     try:
-        df = pd.read_csv(StringIO(s3_hook.read_key(
-            bucket_name="airflow-alphavantage-bucket", key="data/final/alphavantage.csv")))
+        df = pd.read_csv(StringIO(s3_hook.read_key(bucket_name="airflow-alphavantage-bucket", key="data/final/alphavantage.csv")))
         df["date"] = pd.to_datetime(df["date"])
         df["day"] = df["date"].dt.day_name()
         df["month"] = df["date"].dt.month_name()
