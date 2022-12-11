@@ -29,18 +29,22 @@ dag = DAG(
     dag_id="alphavantage",
     default_args=default_args,
     schedule=timedelta(minutes=60),
-    catchup=False, 
+    catchup=False,
     tags=["alphavantage"]
 )
 
-# function to download data from the alphavantage api    
+# function to check if day is a business day
+def is_business_day(date):
+    return bool(len(pd.bdate_range(date, date)))
+
+# function to download data from the alphavantage api
 def download_alphavantage_api_data(var_name, params, **kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
     params["apikey"] = secret_keys.apikey
     try:
         results = requests.get(
-            url="https://www.alphavantage.co/query", 
+            url="https://www.alphavantage.co/query",
             params=params
         )
         data = results.json()
@@ -49,8 +53,8 @@ def download_alphavantage_api_data(var_name, params, **kwargs) -> None:
         df["date"] = pd.to_datetime(df["date"])
         string_data = df.to_csv(header=True, index=False)
         s3_hook.load_string(
-            string_data=string_data, 
-            key=f"data/raw/{var_name}.csv", 
+            string_data=string_data,
+            key=f"data/raw/{var_name}.csv",
             bucket_name="airflow-alphavantage-bucket",
             replace=True
         )
@@ -81,8 +85,8 @@ def get_company_earnings(params, **kwargs) -> None:
             df = pd.merge(annual_df, quarterly_df, how="outer")
             string_data = df.to_csv(header=True, index=False)
             s3_hook.load_string(
-                string_data=string_data, 
-                key=f"data/raw/{company.lower()}_earnings.csv", 
+                string_data=string_data,
+                key=f"data/raw/{company.lower()}_earnings.csv",
                 bucket_name="airflow-alphavantage-bucket",
                 replace=True
             )
@@ -115,6 +119,7 @@ def get_spy_daily_data(params, **kwargs) -> None:
         logging.error(e)
     time.sleep(15)
 
+
 def clean_api_data(**kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
@@ -125,6 +130,7 @@ def clean_api_data(**kwargs) -> None:
         )
         df = pd.concat([pd.read_csv(StringIO(s3_hook.read_key(bucket_name="airflow-alphavantage-bucket", key=key))) for key in s3_keys])
         df["date"] = pd.to_datetime(df["date"])
+        df = df[df["date"].apply(is_business_day)]
         df.sort_values(by="date", inplace=True, ignore_index=True)
         df.replace({".": np.nan, "None": np.nan}, inplace=True)
         df.fillna(method="ffill", inplace=True)
@@ -133,7 +139,7 @@ def clean_api_data(**kwargs) -> None:
         df[cols] = df[cols].apply(pd.to_numeric)
         string_data = df.to_csv(header=True, index=False)
         s3_hook.load_string(
-            string_data=string_data, 
+            string_data=string_data,
             key="data/final/alphavantage.csv",
             bucket_name="airflow-alphavantage-bucket",
             replace=True
@@ -142,11 +148,13 @@ def clean_api_data(**kwargs) -> None:
         logging.error(e)
     time.sleep(15)
 
+
 def create_new_data_features(**kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
     try:
-        df = pd.read_csv(StringIO(s3_hook.read_key(bucket_name="airflow-alphavantage-bucket", key="data/final/alphavantage.csv")))
+        df = pd.read_csv(StringIO(s3_hook.read_key(
+            bucket_name="airflow-alphavantage-bucket", key="data/final/alphavantage.csv")))
         df["date"] = pd.to_datetime(df["date"])
         df["day"] = df["date"].dt.day_name()
         df["month"] = df["date"].dt.month_name()
@@ -154,8 +162,8 @@ def create_new_data_features(**kwargs) -> None:
         df = df[df["date"] >= "2002-01-01"]
         string_data = df.to_csv(header=True, index=False)
         s3_hook.load_string(
-            string_data=string_data, 
-            key="data/final/alphavantage.csv", 
+            string_data=string_data,
+            key="data/final/alphavantage.csv",
             bucket_name="airflow-alphavantage-bucket",
             replace=True
         )
@@ -163,13 +171,14 @@ def create_new_data_features(**kwargs) -> None:
         logging.error(e)
     time.sleep(15)
 
+
 gdp = PythonOperator(
     task_id="get_gdp_data",
     python_callable=download_alphavantage_api_data,
     op_kwargs={
         "var_name": "gross_domestic_product",
         "params": {
-            "function": "REAL_GDP", 
+            "function": "REAL_GDP",
             "interval": "quarterly"
         }
     },
@@ -194,8 +203,8 @@ two_year_treasury_yield = PythonOperator(
     op_kwargs={
         "var_name": "2yr_treasury_yield",
         "params": {
-            "function": "TREASURY_YIELD", 
-            "interval": "daily", 
+            "function": "TREASURY_YIELD",
+            "interval": "daily",
             "maturity": "2year"
         }
     },
@@ -208,8 +217,8 @@ five_year_treasury_yield = PythonOperator(
     op_kwargs={
         "var_name": "5yr_treasury_yield",
         "params": {
-            "function": "TREASURY_YIELD", 
-            "interval": "daily", 
+            "function": "TREASURY_YIELD",
+            "interval": "daily",
             "maturity": "5year"
         }
     },
@@ -222,8 +231,8 @@ ten_year_treasury_yield = PythonOperator(
     op_kwargs={
         "var_name": "10yr_treasury_yield",
         "params": {
-            "function": "TREASURY_YIELD", 
-            "interval": "daily", 
+            "function": "TREASURY_YIELD",
+            "interval": "daily",
             "maturity": "10year"
         }
     },
@@ -236,8 +245,8 @@ thirty_year_treasury_yield = PythonOperator(
     op_kwargs={
         "var_name": "30yr_treasury_yield",
         "params": {
-            "function": "TREASURY_YIELD", 
-            "interval": "daily", 
+            "function": "TREASURY_YIELD",
+            "interval": "daily",
             "maturity": "30year"
         }
     },
@@ -250,7 +259,7 @@ federal_interest_rate_data = PythonOperator(
     op_kwargs={
         "var_name": "federal_interest_rate",
         "params": {
-            "function": "FEDERAL_FUNDS_RATE", 
+            "function": "FEDERAL_FUNDS_RATE",
             "interval": "daily"
         }
     },
@@ -263,7 +272,7 @@ consumer_price_index_data = PythonOperator(
     op_kwargs={
         "var_name": "consumer_price_index",
         "params": {
-            "function": "CPI", 
+            "function": "CPI",
             "interval": "monthly"
         }
     },
@@ -276,7 +285,7 @@ inflation_rate_data = PythonOperator(
     op_kwargs={
         "var_name": "inflation_rate",
         "params": {
-            "function": "INFLATION" 
+            "function": "INFLATION"
         }
     },
     dag=dag
@@ -288,7 +297,7 @@ inflation_expectation_data = PythonOperator(
     op_kwargs={
         "var_name": "inflation_expectation",
         "params": {
-            "function": "INFLATION_EXPECTATION" 
+            "function": "INFLATION_EXPECTATION"
         }
     },
     dag=dag
@@ -334,7 +343,7 @@ unemployment_data = PythonOperator(
     task_id="get_unemployment_data",
     python_callable=download_alphavantage_api_data,
     op_kwargs={
-        "var_name": "unemployment_data",
+        "var_name": "unemployment",
         "params": {
             "function": "UNEMPLOYMENT"
         }
@@ -372,7 +381,7 @@ spy_daily_data = PythonOperator(
         "params": {
             "function": "TIME_SERIES_DAILY_ADJUSTED",
             "symbol": "SPY",
-            "outputsize": "full" 
+            "outputsize": "full"
         }
     },
     dag=dag

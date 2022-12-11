@@ -130,6 +130,3 @@ dmypy.json
 
 # ignore secret_keys.py
 secret_keys.py
-
-# ignore data.ipynb
-data.ipynb
