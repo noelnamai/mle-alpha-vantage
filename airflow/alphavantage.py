@@ -33,17 +33,15 @@ dag = DAG(
     tags=["alphavantage"]
 )
 
-
 # function to check if day is a business day
 def is_business_day(date):
     return bool(len(pd.bdate_range(date, date)))
-
 
 # function to download data from the alphavantage api
 def download_alphavantage_api_data(var_name, params, **kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
-    params["apikey"] = secret_keys.apikey
+    params["apikey"] = secret_keys.alphavantage_key
     try:
         results = requests.get(
             url="https://www.alphavantage.co/query",
@@ -62,16 +60,15 @@ def download_alphavantage_api_data(var_name, params, **kwargs) -> None:
         )
     except Exception as e:
         logging.error(e)
-    time.sleep(15)
-
+    time.sleep(30)
 
 # function to download top five spy company earnings
 def get_company_earnings(params, **kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
     for company in ["AAPL", "MSFT", "AMZN", "TSLA", "GOOGL"]:
-        params["company"] = company
-        params["apikey"] = secret_keys.apikey
+        params["symbol"] = company
+        params["apikey"] = secret_keys.alphavantage_key
         try:
             results = requests.get(
                 url="https://www.alphavantage.co/query",
@@ -95,14 +92,13 @@ def get_company_earnings(params, **kwargs) -> None:
             )
         except Exception as e:
             logging.error(e)
-        time.sleep(15)
-
+        time.sleep(30)
 
 # function to download spy daily data
 def get_spy_daily_data(params, **kwargs) -> None:
     os.environ["no_proxy"] = "*"
     s3_hook.get_conn()
-    params["apikey"] = secret_keys.apikey
+    params["apikey"] = secret_keys.alphavantage_key
     try:
         results = requests.get(
             url="https://www.alphavantage.co/query",
@@ -121,8 +117,7 @@ def get_spy_daily_data(params, **kwargs) -> None:
         )
     except Exception as e:
         logging.error(e)
-    time.sleep(15)
-
+    time.sleep(30)
 
 def clean_api_data(**kwargs) -> None:
     os.environ["no_proxy"] = "*"
@@ -138,9 +133,9 @@ def clean_api_data(**kwargs) -> None:
         df.sort_values(by="date", inplace=True, ignore_index=True)
         df.replace({".": np.nan, "None": np.nan}, inplace=True)
         df.fillna(method="ffill", inplace=True)
-        df.fillna(method="bfill", inplace=True)
-        cols = df.columns.drop(["date"])
-        df[cols] = df[cols].apply(pd.to_numeric)
+        numeric_columns = df.columns.drop(["date"])
+        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
+        df.drop_duplicates(inplace=True, keep="last", ignore_index=True)
         string_data = df.to_csv(header=True, index=False)
         s3_hook.load_string(
             string_data=string_data,
@@ -150,8 +145,7 @@ def clean_api_data(**kwargs) -> None:
         )
     except Exception as e:
         logging.error(e)
-    time.sleep(15)
-
+    time.sleep(30)
 
 def create_new_data_features(**kwargs) -> None:
     os.environ["no_proxy"] = "*"
@@ -172,7 +166,7 @@ def create_new_data_features(**kwargs) -> None:
         )
     except Exception as e:
         logging.error(e)
-    time.sleep(15)
+    time.sleep(30)
 
 
 gdp = PythonOperator(
