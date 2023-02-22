@@ -1,9 +1,8 @@
 from model import predict
-from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
+from fastapi import FastAPI, Query, HTTPException
 
 app = FastAPI()
-
 
 class ValuesIn(BaseModel):
     nonfarm_payroll: float
