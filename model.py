@@ -19,10 +19,14 @@ def train(X_train, y_train):
     pickle.dump(model, open("model.pkl", "wb"))
 
 def predict(nonfarm_payroll, unemployment_rate, producer_price_index, consumer_price_index, gross_domestic_product, open_price):
-    model = pickle.load(open("model.pkl", "rb"))
-    X_test = np.array([nonfarm_payroll, unemployment_rate, producer_price_index, consumer_price_index, gross_domestic_product, open_price]).reshape(1, -1)
-    y_test = model.predict(X_test)
-    return y_test[0]
+    try:
+        model = pickle.load(open("model.pkl", "rb"))
+        X_test = np.array([nonfarm_payroll, unemployment_rate, producer_price_index, consumer_price_index, gross_domestic_product, open_price]).reshape(1, -1)
+        y_test = model.predict(X_test)
+    except:
+        return 0
+    else:
+        return y_test[0]
 
 if __name__ == "__main__":
     data = pd.read_csv("s3://mle-capstone-bucket/data/final/economic-data.csv", index_col="date")
